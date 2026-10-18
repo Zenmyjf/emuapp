@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
 import android.os.Build;
+import android.os.Handler;
+import android.view.Gravity;
+import android.webkit.ValueCallback;
+import android.widget.TextView;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +22,8 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private FrameLayout root;
+    private TextView dbgView;
+    private final Handler handler = new Handler();
     private View customView;
     private WebChromeClient.CustomViewCallback customCallback;
 
@@ -64,11 +70,7 @@ public class MainActivity extends Activity {
         + "document.documentElement.style.overflow='hidden';"
         + "document.body.style.overflow='hidden';}"
         + "var target=null;"
-        + "var dbg=null;"
-        + "function say(t){if(!dbg){dbg=document.createElement('div');"
-        + "dbg.style.cssText='position:fixed;left:4px;bottom:4px;z-index:2147483647;"
-        + "font:11px monospace;color:#ff0;background:rgba(0,0,0,.6);pointer-events:none;padding:2px 4px';"
-        + "document.body.appendChild(dbg);}dbg.textContent=t;}"
+        + "function say(t){window.__dbg=t;}"
         + "function fitStream(root){var c=[];"
         + "if(/^(CANVAS|VIDEO|IMG)$/.test(root.tagName))c.push(root);"
         + "var q=root.querySelectorAll('canvas,video,img');"
@@ -80,7 +82,10 @@ public class MainActivity extends Activity {
         + "else{w=e.width;h=e.height;}"
         + "if(w*h>bs){best=e;bs=w*h;bw=w;bh=h;}}"
         + "if(!best||bs<40000){var f=root.tagName==='IFRAME'?root:root.querySelector('iframe');"
-        + "say('no stream; root='+root.tagName+' iframe='+(f?(f.src||'').slice(0,70):'none'));return;}"
+        + "var rr=root.getBoundingClientRect();"
+        + "say('no stream; root='+root.tagName+' '+Math.round(rr.width)+'x'+Math.round(rr.height)"
+        + "+' view '+W()+'x'+H()+' frames='+root.querySelectorAll('iframe').length"
+        + "+' src='+(f?(f.src||'').slice(0,90):'none'));return;}"
         + "var k=Math.min(W()/bw,H()/bh),st=best.style;"
         + "st.setProperty('position','fixed','important');"
         + "st.setProperty('left','50%','important');"
@@ -104,12 +109,16 @@ public class MainActivity extends Activity {
         + "if(r.bottom>=H()-4&&r.height<H()*0.4&&r.width>W()*0.6)"
         + "e.style.setProperty('display','none','important');}}}"
         + "var n=0;"
-        + "setInterval(function(){n++;"
+        + "setInterval(function(){n++;try{"
         + "var b=enters();"
         + "if(b.length===1&&!b[0].__clicked&&n<80){b[0].__clicked=true;b[0].click();return;}"
-        + "if(b.length===0&&hasExit()){"
+        + "var ex=hasExit();"
+        + "if(b.length===0&&ex){"
         + "if(!target||!target.isConnected){target=pick();if(target)fit(target);}"
-        + "if(target){fitStream(target);if(n%4===0)hide();}}"
+        + "if(target){fitStream(target);if(n%4===0)hide();}"
+        + "else say('exit found but no target');}"
+        + "else say('enters='+b.length+' exit='+ex+' page='+location.pathname.slice(-25));"
+        + "}catch(x){say('ERR '+x.message);}"
         + "},500);"
         + "})();";
 
@@ -132,6 +141,18 @@ public class MainActivity extends Activity {
         root.addView(webView, new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT));
+        dbgView = new TextView(this);
+        dbgView.setTextColor(Color.YELLOW);
+        dbgView.setBackgroundColor(0x99000000);
+        dbgView.setTextSize(10);
+        dbgView.setPadding(8, 2, 8, 2);
+        dbgView.setMaxLines(3);
+        dbgView.setText("build 4");
+        FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT);
+        dlp.gravity = Gravity.BOTTOM | Gravity.START;
+        root.addView(dbgView, dlp);
         setContentView(root);
 
         WebSettings s = webView.getSettings();
@@ -173,6 +194,20 @@ public class MainActivity extends Activity {
             @Override
             public void onHideCustomView() {
                 hideCustom();
+            }
+        });
+
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                webView.evaluateJavascript("(window.__dbg||'')", new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String v) {
+                        String t = (v == null) ? "" : v.replace("\"", "");
+                        dbgView.setText("build 4 | " + t);
+                    }
+                });
+                handler.postDelayed(this, 1000);
             }
         });
 
