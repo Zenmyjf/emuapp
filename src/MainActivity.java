@@ -6,6 +6,8 @@ import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.view.Gravity;
+import android.widget.Button;
+import android.widget.LinearLayout;
 import android.webkit.ValueCallback;
 import android.widget.TextView;
 import android.os.Bundle;
@@ -23,6 +25,7 @@ public class MainActivity extends Activity {
     private WebView webView;
     private FrameLayout root;
     private TextView dbgView;
+    private float zoomK = 2.0f;
     private final Handler handler = new Handler();
     private View customView;
     private WebChromeClient.CustomViewCallback customCallback;
@@ -67,6 +70,7 @@ public class MainActivity extends Activity {
         + "s.setProperty('border','0','important');"
         + "s.setProperty('background','#000','important');"
         + "s.setProperty('z-index','2147483647','important');"
+        + "s.setProperty('overflow','hidden','important');"
         + "document.documentElement.style.overflow='hidden';"
         + "document.body.style.overflow='hidden';}"
         + "var target=null;"
@@ -82,10 +86,20 @@ public class MainActivity extends Activity {
         + "else{w=e.width;h=e.height;}"
         + "if(w*h>bs){best=e;bs=w*h;bw=w;bh=h;}}"
         + "if(!best||bs<40000){var f=root.tagName==='IFRAME'?root:root.querySelector('iframe');"
-        + "var rr=root.getBoundingClientRect();"
-        + "say('no stream; root='+root.tagName+' '+Math.round(rr.width)+'x'+Math.round(rr.height)"
-        + "+' view '+W()+'x'+H()+' frames='+root.querySelectorAll('iframe').length"
-        + "+' src='+(f?(f.src||'').slice(0,90):'none'));return;}"
+        + "if(f){var kk=window.__k||2;var q2=f.style;"
+        + "q2.setProperty('position',root===f?'fixed':'absolute','important');"
+        + "q2.setProperty('left','0','important');"
+        + "q2.setProperty('top','0','important');"
+        + "q2.setProperty('width',(W()*kk)+'px','important');"
+        + "q2.setProperty('height',(H()*kk)+'px','important');"
+        + "q2.setProperty('max-width','none','important');"
+        + "q2.setProperty('max-height','none','important');"
+        + "q2.setProperty('margin','0','important');"
+        + "q2.setProperty('border','0','important');"
+        + "q2.setProperty('transform-origin','0 0','important');"
+        + "q2.setProperty('transform','scale('+(1/kk)+')','important');"
+        + "say('iframe zoom '+kk.toFixed(2)+' virtual '+Math.round(W()*kk)+'x'+Math.round(H()*kk));return;}"
+        + "say('no stream, no iframe; root='+root.tagName);return;}"
         + "var k=Math.min(W()/bw,H()/bh),st=best.style;"
         + "st.setProperty('position','fixed','important');"
         + "st.setProperty('left','50%','important');"
@@ -147,12 +161,22 @@ public class MainActivity extends Activity {
         dbgView.setTextSize(10);
         dbgView.setPadding(8, 2, 8, 2);
         dbgView.setMaxLines(3);
-        dbgView.setText("build 4");
+        dbgView.setText("build 5");
         FrameLayout.LayoutParams dlp = new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.WRAP_CONTENT,
             ViewGroup.LayoutParams.WRAP_CONTENT);
         dlp.gravity = Gravity.BOTTOM | Gravity.START;
         root.addView(dbgView, dlp);
+        float d = getResources().getDisplayMetrics().density;
+        LinearLayout zoomBox = new LinearLayout(this);
+        zoomBox.setOrientation(LinearLayout.VERTICAL);
+        zoomBox.addView(makeZoomButton("+", -0.25f, d));
+        zoomBox.addView(makeZoomButton("-", 0.25f, d));
+        FrameLayout.LayoutParams zlp = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT);
+        zlp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        root.addView(zoomBox, zlp);
         setContentView(root);
 
         WebSettings s = webView.getSettings();
@@ -172,7 +196,7 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                view.evaluateJavascript(JS, null);
+                view.evaluateJavascript("window.__k=" + zoomK + ";" + JS, null);
             }
         });
 
@@ -204,7 +228,7 @@ public class MainActivity extends Activity {
                     @Override
                     public void onReceiveValue(String v) {
                         String t = (v == null) ? "" : v.replace("\"", "");
-                        dbgView.setText("build 4 | " + t);
+                        dbgView.setText("build 5 | " + t);
                     }
                 });
                 handler.postDelayed(this, 1000);
@@ -212,6 +236,24 @@ public class MainActivity extends Activity {
         });
 
         webView.loadUrl(URL);
+    }
+
+    private Button makeZoomButton(String label, final float delta, float density) {
+        Button b = new Button(this);
+        b.setText(label);
+        b.setAlpha(0.6f);
+        b.setMinWidth(0);
+        b.setMinimumWidth(0);
+        b.setLayoutParams(new LinearLayout.LayoutParams(
+            (int) (52 * density), (int) (52 * density)));
+        b.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                zoomK = Math.max(1.0f, Math.min(4.0f, zoomK + delta));
+                webView.evaluateJavascript("window.__k=" + zoomK + ";", null);
+            }
+        });
+        return b;
     }
 
     private void hideCustom() {
