@@ -1,0 +1,23 @@
+plugins {
+    id 'com.android.application' version '8.5.2'
+}
+
+android {
+    namespace 'com.example.emu'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'com.example.emu'
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['.']
+        }
+    }
+}
